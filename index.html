@@ -8,28 +8,33 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 10px; margin: 0; background-color: #f4f4f9; color: #333; }
-    .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); box-sizing: border-box; }
     h2 { margin-top: 0; color: #2c3e50; text-align: center; border-bottom: 2px solid #eee; padding-bottom: 10px; }
 
     .section { border: 1px solid #e0e0e0; padding: 15px; margin-bottom: 15px; border-radius: 8px; background: #fafafa; }
     .section h3 { margin-top: 0; font-size: 16px; border-bottom: 1px solid #ddd; padding-bottom: 8px; color: #555; }
     
     input, button { padding: 12px; font-size: 15px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
-    .input-group { margin-bottom: 10px; display: flex; flex-direction: column; width: 100%; }
+    .input-group { margin-bottom: 10px; display: flex; flex-direction: column; width: 100%; box-sizing: border-box; }
     .input-group label { font-size: 13px; margin-bottom: 5px; color: #666; font-weight: bold; }
-    .flex-row { display: flex; gap: 10px; }
+    .input-group input { width: 100%; } /* Prevents the box from bleeding off the screen */
+    
+    .flex-row { display: flex; gap: 10px; width: 100%; }
     
     .image-upload-wrapper { display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px dashed #ccc; padding: 15px; border-radius: 8px; background: #fff; cursor: pointer; margin-bottom: 15px; text-align: center; }
-    #item-preview { max-width: 100%; max-height: 250px; border-radius: 8px; display: none; margin-top: 10px; object-fit: contain; }
+    
+    #image-preview-container { display: none; flex-direction: column; align-items: center; margin-top: 10px; margin-bottom: 15px; }
+    #item-preview { max-width: 100%; max-height: 250px; border-radius: 8px; object-fit: contain; }
+    .remove-photo-btn { margin-top: 10px; background: #ff4757; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; }
 
     .tabs { display: flex; margin-bottom: 15px; background: #eee; border-radius: 8px; overflow: hidden; }
     .tab-btn { flex: 1; padding: 12px; border: none; background: transparent; font-size: 14px; font-weight: bold; color: #666; cursor: pointer; transition: 0.2s; }
     .tab-btn.active { background: #2c3e50; color: white; }
 
-    .gem-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; }
+    .gem-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; width: 100%; }
     .select-size-btn { flex: 2; background: white; cursor: pointer; text-align: left; color: #333; font-weight: bold; border: 2px solid #2c3e50; }
     .custom-price { flex: 1.2; min-width: 70px; display: none; background-color: #fffbdd; }
-    .gem-qty { flex: 1; min-width: 60px; }
+    .gem-qty { flex: 1; min-width: 65px; }
     .delete-btn { background: #ff4757; color: white; border: none; padding: 12px; cursor: pointer; font-weight: bold; }
     .add-btn { background: #2ed573; color: white; border: none; width: 100%; font-weight: bold; cursor: pointer; margin-top: 5px; }
 
@@ -89,11 +94,15 @@
       </div>
     </div>
     
-    <label class="image-upload-wrapper no-print">
+    <label class="image-upload-wrapper no-print" id="upload-btn-wrapper">
       <span style="font-size: 14px; color: #666;">📷 Tap to Upload Photo</span>
       <input type="file" id="image-upload" accept="image/*" style="display: none;" onchange="previewAndCompressImage(event)">
     </label>
-    <img id="item-preview" src="" alt="Jewelry Preview">
+    
+    <div id="image-preview-container">
+      <img id="item-preview" src="" alt="Jewelry Preview">
+      <button class="remove-photo-btn no-print" onclick="removePhoto()">🗑️ Remove Photo</button>
+    </div>
   </div>
 
   <div class="tabs no-print">
@@ -206,9 +215,10 @@
         else { btnText = size; displayCustom = "inline-block"; }
     }
 
+    // UPDATED: step="0.01" to trigger decimal keyboard, changed placeholder to Qty/Ct
     row.innerHTML = `<button class="select-size-btn" onclick="openGemModal(this)" data-size="${size}">${btnText}</button>
-                     <input type="number" class="custom-price" placeholder="Price $" value="${customP}" style="display:${displayCustom}" oninput="calculateTotal()">
-                     <input type="number" class="gem-qty" placeholder="Qty" value="${qty}" min="1" oninput="calculateTotal()">
+                     <input type="number" class="custom-price" placeholder="Price $" value="${customP}" style="display:${displayCustom}" step="0.01" oninput="calculateTotal()">
+                     <input type="number" class="gem-qty" placeholder="Qty / Ct" value="${qty}" min="0.01" step="0.01" oninput="calculateTotal()">
                      <button class="delete-btn no-print" onclick="this.parentElement.remove(); calculateTotal()">X</button>`;
     container.appendChild(row);
   }
@@ -259,7 +269,9 @@
        if (sizeKey) {
          let price = pricingData[currentCustomerType][sizeKey] || 0;
          if (price === 0) price = parseFloat(row.querySelector('.custom-price').value) || 0;
-         const quantity = parseInt(row.querySelector('.gem-qty').value) || 0;
+         
+         // UPDATED: Swapped parseInt to parseFloat so it handles decimals properly!
+         const quantity = parseFloat(row.querySelector('.gem-qty').value) || 0;
          total += (price * quantity);
        }
     });
@@ -269,7 +281,6 @@
     return total;
   }
 
-  // IMAGE COMPRESSOR
   function previewAndCompressImage(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -279,7 +290,7 @@
       const img = new Image();
       img.onload = function() {
         const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 400; // Shrinks image width to 400px
+        const MAX_WIDTH = 400; 
         const scaleSize = MAX_WIDTH / img.width;
         canvas.width = MAX_WIDTH;
         canvas.height = img.height * scaleSize;
@@ -287,16 +298,26 @@
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-        // Convert canvas back to a highly compressed JPEG
         savedImageData = canvas.toDataURL('image/jpeg', 0.6); 
         
         const imgElement = document.getElementById('item-preview');
         imgElement.src = savedImageData;
-        imgElement.style.display = 'block';
+        
+        document.getElementById('upload-btn-wrapper').style.display = 'none';
+        document.getElementById('image-preview-container').style.display = 'flex';
       };
       img.src = e.target.result;
     };
     reader.readAsDataURL(file);
+  }
+
+  function removePhoto() {
+    savedImageData = "";
+    document.getElementById('item-preview').src = "";
+    document.getElementById('image-upload').value = ""; 
+    
+    document.getElementById('image-preview-container').style.display = 'none';
+    document.getElementById('upload-btn-wrapper').style.display = 'flex';
   }
 
   function exportImage() {
@@ -353,7 +374,7 @@
 
     let history = JSON.parse(localStorage.getItem('jobHistory')) || [];
     history.unshift(job); 
-    if (history.length > 20) history = history.slice(0, 20); // Now safely handles 20 jobs
+    if (history.length > 20) history = history.slice(0, 20); 
     
     localStorage.setItem('jobHistory', JSON.stringify(history));
     alert("Job saved successfully!");
@@ -386,9 +407,13 @@
     document.getElementById('quote-date').value = job.date;
     
     savedImageData = job.image || "";
-    const imgElement = document.getElementById('item-preview');
-    if (savedImageData) { imgElement.src = savedImageData; imgElement.style.display = 'block'; } 
-    else { imgElement.style.display = 'none'; }
+    if (savedImageData) { 
+        document.getElementById('item-preview').src = savedImageData; 
+        document.getElementById('upload-btn-wrapper').style.display = 'none';
+        document.getElementById('image-preview-container').style.display = 'flex';
+    } else { 
+        removePhoto(); 
+    }
 
     setCustomerType(job.type);
     document.getElementById('metal-weight').value = job.metalWeight;
@@ -407,8 +432,7 @@
   function clearAll() {
     document.getElementById('customer-name').value = '';
     document.getElementById('quote-date').valueAsDate = new Date();
-    document.getElementById('item-preview').style.display = 'none';
-    savedImageData = '';
+    removePhoto(); 
     document.getElementById('gem-container').innerHTML = '';
     document.getElementById('metal-weight').value = '';
     document.getElementById('metal-cost').value = '';
